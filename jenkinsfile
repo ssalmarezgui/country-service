@@ -5,39 +5,38 @@ pipeline {
         jdk 'JDK21'
     }
     stages {
-        stage('Checkout code')
-        {
+        stage('Checkout code') {
             steps {
-                git branch: 'main', url: 'https://github.com/ssalmarezgui/country-service.git'
+                checkout scm
             }
         }
-        stage('Compile code')
-        {
+        stage('Compile code') {
             steps {
                 sh 'mvn compile'
             }
         }
-        stage('Test code')
-        {
+        stage('Test code') {
             steps {
                 sh 'mvn test'
             }
             post {
-                success {
+                always {
                     junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
                 }
             }
         }
-        stage('Package code')
-        {
+        stage('Package code') {
             steps {
-                sh 'mvn package'
+                sh 'mvn package -DskipTests'
             }
         }
-        stage('Deploy to Nexus')
-        {
+        stage('Deploy to Nexus') {
             steps {
-                sh 'mvn deploy -DskipTests'
+                withCredentials([usernamePassword(credentialsId: 'nexus-creds',
+                                 usernameVariable: 'NEXUS_USER',
+                                 passwordVariable: 'NEXUS_PASS')]) {
+                    sh 'mvn -s settings.xml deploy -DskipTests'
+                }
             }
         }
     }
