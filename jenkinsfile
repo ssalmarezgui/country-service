@@ -53,5 +53,21 @@ pipeline {
                 }
             }
         }
+        stage('Upload reports to Nexus') {
+    steps {
+        withCredentials([usernamePassword(credentialsId: 'nexus-creds',
+                         usernameVariable: 'NEXUS_USER',
+                         passwordVariable: 'NEXUS_PASS')]) {
+            sh '''
+                tar -czf jacoco-report.tar.gz -C target/site jacoco
+                tar -czf surefire-reports.tar.gz -C target surefire-reports
+                curl -f -u "$NEXUS_USER:$NEXUS_PASS" --upload-file jacoco-report.tar.gz \
+                     "http://localhost:8081/repository/reports/country-service/$BUILD_NUMBER/jacoco-report.tar.gz"
+                curl -f -u "$NEXUS_USER:$NEXUS_PASS" --upload-file surefire-reports.tar.gz \
+                     "http://localhost:8081/repository/reports/country-service/$BUILD_NUMBER/surefire-reports.tar.gz"
+            '''
+        }
+    }
+}
     }
 }
