@@ -1,12 +1,13 @@
 pipeline {
     agent any
     tools {
-        maven 'mymaven'
+        maven 'M2_HOME'
+        jdk 'JDK21'
     }
     stages {
         stage('Checkout code') {
             steps {
-                git branch: 'main', url: 'https://github.com/ssalmarezgui/country-service.git'
+                checkout scm
             }
         }
         stage('Build maven') {
