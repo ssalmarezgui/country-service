@@ -19,7 +19,7 @@ pipeline {
             steps {
                 sh 'docker build -t ssalmarezgui/my-country-service:$BUILD_NUMBER .'
                 
-                withCredentials([string(credentialsId: 'dockerhub-pwd', variable: 'dockerhubpwd')]) {
+                withCredentials([string(credentialsId: 'dockerhub-paswd', variable: 'dockerhubpwd')]) {
                     sh 'docker login -u ssalmarezgui -p ${dockerhubpwd}'
                 }
                 
