@@ -5,8 +5,9 @@ metadata:
 spec:
   type: NodePort
   selector:
-    app: my-country-service-deployement
+    app: country-service
   ports:
     - port: 8082
       targetPort: 8082
       nodePort: 30600
+      protocol: TCP
