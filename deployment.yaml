@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
         - name: my-country-service
-          image: majdaaa/my-compte-service:v1
+          image: majdaaa/my-compte-service:IMAGE_TAG
           ports:
             - containerPort: 8082
