@@ -46,7 +46,7 @@ pipeline {
                             sh "sed -i 's|IMAGE_PLACEHOLDER|majdaaa/my-compte-service:${BUILD_NUMBER}|' deployment.yaml"
             sh 'kubectl apply -f deployment.yaml'
             sh 'kubectl apply -f service.yaml'
-            sh 'kubectl rollout status deployment/my-country-service --timeout=120s'
+            sh 'kubectl rollout status deployment/my-country-service-deployement --timeout=120s'
         }
                     }
                 }
