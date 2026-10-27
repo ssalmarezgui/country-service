@@ -43,11 +43,11 @@ pipeline {
                     withEnv(["PATH+KUBECTL=${WORKSPACE}/bin"]) {
                         kubeconfig(credentialsId: 'kubeconfig-file', serverUrl: '') {
                             // Remplacement du tag IMAGE_TAG par le numéro de build Jenkins
-                            sh "sed -i 's/IMAGE_TAG/${BUILD_NUMBER}/g' deployment.yaml"
-                            sh 'kubectl apply -f deployment.yaml'
-                            sh 'kubectl apply -f service.yaml'
-                            sh 'kubectl rollout status deployment/my-country-service-deployement'
-                        }
+                            sh "sed -i 's|IMAGE_PLACEHOLDER|majdaaa/my-compte-service:${BUILD_NUMBER}|' deployment.yaml"
+            sh 'kubectl apply -f deployment.yaml'
+            sh 'kubectl apply -f service.yaml'
+            sh 'kubectl rollout status deployment/my-country-service --timeout=120s'
+        }
                     }
                 }
             }
