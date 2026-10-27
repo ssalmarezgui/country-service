@@ -1,12 +1,11 @@
 pipeline {
     agent any
 
-    // 1. Permet de choisir l'environnement lors du build (Build with Parameters)
     parameters {
         choice(
             name: 'NAMESPACE',
-            choices: ['majda-env', 'salma-env'],
-            description: 'Sélectionnez l\'environnement cible pour le déploiement'
+            choices: ['salma-env', 'majda-env'],
+            description: 'Qui lance le déploiement ?'
         )
     }
 
@@ -30,17 +29,27 @@ pipeline {
 
         stage('Build Dockerfile') {
             steps {
-                // On inclut le namespace dans le tag Docker pour éviter d'écraser l'image de l'autre
-                sh "docker build -t my-compte-service:${params.NAMESPACE}-${BUILD_NUMBER} ."
-                
-                withCredentials([string(credentialsId: 'dockerhub-paswd', variable: 'dockerhubpwd')]) {
-                    sh 'echo $dockerhubpwd | docker login -u majdaaa --password-stdin'
-                }
-                
-                sh "docker tag my-compte-service:${params.NAMESPACE}-${BUILD_NUMBER} majdaaa/my-compte-service:${params.NAMESPACE}-${BUILD_NUMBER}"
-                
-                retry(3) {
-                    sh "docker push majdaaa/my-compte-service:${params.NAMESPACE}-${BUILD_NUMBER}"
+                script {
+                    // Récupère automatiquement les identifiants de la bonne personne (dockerhub-salma-env ou dockerhub-majda-env)
+                    withCredentials([usernamePassword(
+                        credentialsId: "dockerhub-${params.NAMESPACE}",
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        // 1. Build de l'image
+                        sh "docker build -t my-compte-service:${params.NAMESPACE}-${BUILD_NUMBER} ."
+
+                        // 2. Connexion avec les identifiants de celle qui a lancé le build
+                        sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+
+                        // 3. Tag vers le compte Docker de celle qui a lancé le build
+                        sh "docker tag my-compte-service:${params.NAMESPACE}-${BUILD_NUMBER} ${DOCKER_USER}/my-compte-service:${params.NAMESPACE}-${BUILD_NUMBER}"
+
+                        // 4. Push
+                        retry(3) {
+                            sh "docker push ${DOCKER_USER}/my-compte-service:${params.NAMESPACE}-${BUILD_NUMBER}"
+                        }
+                    }
                 }
             }
         }
@@ -48,7 +57,6 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    // Télécharge kubectl à la volée s'il n'est pas présent
                     sh '''
                         if ! command -v kubectl &> /dev/null; then
                             curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
@@ -57,22 +65,26 @@ pipeline {
                             mv kubectl bin/
                         fi
                     '''
-                    
-                    // Ajoute le dossier 'bin' au PATH pour trouver kubectl
+
                     withEnv(["PATH+KUBECTL=${WORKSPACE}/bin"]) {
                         kubeconfig(credentialsId: 'kubeconfig-file', serverUrl: '') {
                             
-                            // 1. Remplacement de l'image avec le bon tag
-                            sh "sed -i 's|IMAGE_PLACEHOLDER|majdaaa/my-compte-service:${params.NAMESPACE}-${BUILD_NUMBER}|' deployment.yaml"
+                            // On réutilise le DOCKER_USER pour injecter la bonne image dans le yaml
+                            withCredentials([usernamePassword(
+                                credentialsId: "dockerhub-${params.NAMESPACE}",
+                                usernameVariable: 'DOCKER_USER',
+                                passwordVariable: 'DOCKER_PASS'
+                            )]) {
+                                sh "sed -i 's|IMAGE_PLACEHOLDER|${DOCKER_USER}/my-compte-service:${params.NAMESPACE}-${BUILD_NUMBER}|' deployment.yaml"
+                            }
 
-                            // 2. Crée le namespace automatiquement s'il n'existe pas encore
+                            // Crée le namespace s'il n'existe pas
                             sh "kubectl create namespace ${params.NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -"
 
-                            // 3. Application des fichiers dans le namespace sélectionné
+                            // Déploie dans le bon namespace
                             sh "kubectl apply -f deployment.yaml -n ${params.NAMESPACE}"
                             sh "kubectl apply -f service.yaml -n ${params.NAMESPACE}"
 
-                            // 4. Suivi de l'état du déploiement
                             sh "kubectl rollout status deployment/my-country-service-deployement -n ${params.NAMESPACE} --timeout=120s"
                         }
                     }
