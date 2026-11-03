@@ -32,15 +32,9 @@
         cmd: "docker push {{ dockerhub_username }}/{{ image_name }}:{{ image_tag }}"
 
     - name: Apply Kubernetes Deployment
-      kubernetes.core.k8s:
-        state: present
-        namespace: default
-        src: deployment.yaml
-        kubeconfig: config
+      ansible.builtin.command:
+        cmd: "kubectl apply -f deployment.yaml --kubeconfig=config"
 
     - name: Apply Kubernetes Service
-      kubernetes.core.k8s:
-        state: present
-        namespace: default
-        src: service.yaml
-        kubeconfig: config
+      ansible.builtin.command:
+        cmd: "kubectl apply -f service.yaml --kubeconfig=config"
