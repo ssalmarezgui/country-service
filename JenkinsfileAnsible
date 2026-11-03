@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'M2_HOME'
+        jdk 'JDK21'
+    }
+
+    stages {
+        stage('Checkout code') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build maven') {
+            steps {
+                sh 'mvn clean install'
+            }
+        }
+
+        stage('Deploy using Ansible playbook') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'ansible_vault_pass', variable: 'VAULT_PASS')]) {
+                        // Remplace le placeholder dans deployment.yaml avec le bon nom d'image
+                        sh "sed -i 's|IMAGE_PLACEHOLDER|ssalmarezgui/my-country-service:v1|' deployment.yaml"
+
+                        // Exécute le playbook complet avec le mot de passe Vault
+                        sh '''
+                            echo "$VAULT_PASS" > vault_pass.txt
+                            ansible-playbook -i localhost, -c local playbookCICD.yml --vault-password-file vault_pass.txt
+                            rm -f vault_pass.txt
+                        '''
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Ansible playbook executed successfully!'
+        }
+        failure {
+            echo 'Ansible playbook execution failed!'
+        }
+    }
+}
