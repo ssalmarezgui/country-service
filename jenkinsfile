@@ -46,12 +46,15 @@ pipeline {
             }
         }
 
-        // --- ETAPE ANSIBLE DEMANDEE DANS LE COURS ---
-        stage('Ansible Playbook') {
+        // --- ETAPE ANSIBLE VAULT DU DOCUMENT (PAGE 2) ---
+        stage('Deploy with Ansible') {
             steps {
-                script {
-                    // Exécute le playbook Ansible pour valider l'intégration CI/CD
-                    sh 'ansible-playbook -i localhost, -c local playbookCICD.yml --check || true'
+                withCredentials([string(credentialsId: 'ansible_vault_pass', variable: 'VAULT_PASS')]) {
+                    sh '''
+                        echo "$VAULT_PASS" > vault_pass.txt
+                        ansible-playbook -i localhost, -c local playbookCICD.yml --vault-password-file vault_pass.txt --check || true
+                        rm -f vault_pass.txt
+                    '''
                 }
             }
         }
@@ -91,7 +94,7 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline et Ansible exécutés avec succès !'
+            echo 'Ansible playbook et pipeline executes avec succes !'
         }
     }
 }
