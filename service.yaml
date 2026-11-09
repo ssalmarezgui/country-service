@@ -9,5 +9,5 @@ spec:
   ports:
     - port: 8082
       targetPort: 8082
-      # Pas de nodePort codé en dur ! Kubernetes en choisira un disponible.
+      nodePort: 30007
       protocol: TCP
