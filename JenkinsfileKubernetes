@@ -1,0 +1,70 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'NAMESPACE',
+            choices: ['salma-env', 'majda-env'],
+            description: 'Qui lance le déploiement ?'
+        )
+    }
+
+    tools {
+        maven 'M2_HOME'
+        jdk 'JDK21'
+    }
+
+    stages {
+        stage('Checkout code') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build maven') {
+            steps {
+                sh 'mvn clean install'
+            }
+        }
+
+        stage('Build Dockerfile') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(
+                        credentialsId: "dockerhub-${params.NAMESPACE}",
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh "docker build -t ${DOCKER_USER}/my-country-service:${params.NAMESPACE}-${BUILD_NUMBER} ."
+                        sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
+                        sh "docker push ${DOCKER_USER}/my-country-service:${params.NAMESPACE}-${BUILD_NUMBER}"
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    kubeconfig(credentialsId: 'kubeconfig-file', serverUrl: '') {
+                        withCredentials([usernamePassword(
+                            credentialsId: "dockerhub-${params.NAMESPACE}",
+                            usernameVariable: 'DOCKER_USER',
+                            passwordVariable: 'DOCKER_PASS'
+                        )]) {
+                            sh "sed -i 's|IMAGE_PLACEHOLDER|${DOCKER_USER}/my-country-service:${params.NAMESPACE}-${BUILD_NUMBER}|' deployment.yaml"
+                        }
+                        // Crée le namespace s'il n'existe pas
+                        sh "kubectl create namespace ${params.NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -"
+
+                        // Déploie le deployment et le service avec le NodePort 30007 dans le bon namespace
+                        sh "kubectl apply -f deployment.yaml -n ${params.NAMESPACE}"
+                        sh "kubectl apply -f service.yaml -n ${params.NAMESPACE}"
+
+                        sh "kubectl rollout status deployment/my-country-service -n ${params.NAMESPACE} --timeout=120s"
+                    }
+                }
+            }
+        }
+    }
+}
