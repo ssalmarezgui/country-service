@@ -23,11 +23,11 @@ pipeline {
             steps {
                 script {
                     withCredentials([string(credentialsId: 'ansible_vault_pass', variable: 'VAULT_PASS')]) {
-                        // Injection du bon tag d'image dans deployment.yaml
                         sh "sed -i 's|IMAGE_PLACEHOLDER|ssalmarezgui/my-country-service:v1|' deployment.yaml"
 
-                        // Exécution du playbook avec Ansible Vault (Slide 75 & PDF Vault)
+                        // On injecte explicitement le PATH pour que docker et kubectl soient trouvés
                         sh '''
+                            export PATH=$PATH:/usr/local/bin:/usr/bin:/bin:/mnt/c/Program\\ Files/Docker/Docker/resources/bin
                             echo "$VAULT_PASS" > vault_pass.txt
                             ansible-playbook -i localhost, -c local playbookCICD.yml --vault-password-file vault_pass.txt
                             rm -f vault_pass.txt
