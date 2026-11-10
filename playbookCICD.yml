@@ -14,18 +14,12 @@
 
   tasks:
     - name: Log in to Docker Hub
-      community.docker.docker_login:
-        username: "{{ dockerhub_username }}"
-        password: "{{ dockerhub_password }}"
-        reauthorize: yes
+      ansible.builtin.shell:
+        cmd: "echo '{{ dockerhub_password }}' | docker login -u '{{ dockerhub_username }}' --password-stdin"
 
     - name: Build Docker image
-      community.docker.docker_image:
-        build:
-          path: "{{ dockerfile_path }}"
-        name: "{{ dockerhub_username }}/{{ image_name }}:{{ image_tag }}"
-        source: build
-        state: present
+      ansible.builtin.command:
+        cmd: "docker build -t {{ dockerhub_username }}/{{ image_name }}:{{ image_tag }} {{ dockerfile_path }}"
 
     - name: Push the Docker image to Docker Hub
       ansible.builtin.command:
