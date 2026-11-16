@@ -1,5 +1,5 @@
 ---
-- name: Build and Deploy Docker Image to Kubernetes
+- name: Build, Push Docker Image and Deploy 3 Pods to Kubernetes
   hosts: localhost
   connection: local
   gather_facts: false
@@ -9,13 +9,15 @@
 
   vars:
     image_name: my-country-service
-    image_tag: v1
-    dockerfile_path: './'
+    image_tag: "{{ image_tag | default('v1') }}"
+    target_namespace: "{{ target_namespace | default('salma-env') }}"
+    dockerfile_path: "./"
 
   tasks:
     - name: Log in to Docker Hub
       ansible.builtin.shell:
         cmd: "echo '{{ dockerhub_password }}' | docker login -u '{{ dockerhub_username }}' --password-stdin"
+      no_log: true
 
     - name: Build Docker image
       ansible.builtin.command:
@@ -25,14 +27,24 @@
       ansible.builtin.command:
         cmd: "docker push {{ dockerhub_username }}/{{ image_name }}:{{ image_tag }}"
 
-    - name: Pull Docker image (optional, for verification or on target nodes)
-      ansible.builtin.command:
-        cmd: "docker pull {{ dockerhub_username }}/{{ image_name }}:{{ image_tag }}"
+    - name: Inject image tag into deployment.yaml
+      ansible.builtin.replace:
+        path: deployment.yaml
+        regexp: 'IMAGE_PLACEHOLDER'
+        replace: "{{ dockerhub_username }}/{{ image_name }}:{{ image_tag }}"
 
-    - name: Apply Kubernetes Deployment
+    - name: Ensure Kubernetes namespace exists
+      ansible.builtin.shell:
+        cmd: "kubectl create namespace {{ target_namespace }} --dry-run=client -o yaml | kubectl apply -f -"
+
+    - name: Apply Kubernetes Deployment (3 pods)
       ansible.builtin.command:
-        cmd: "kubectl apply -f deployment.yaml --kubeconfig=config -n salma-env"
+        cmd: "kubectl apply -f deployment.yaml -n {{ target_namespace }}"
 
     - name: Apply Kubernetes Service
       ansible.builtin.command:
-        cmd: "kubectl apply -f service.yaml --kubeconfig=config -n salma-env"
+        cmd: "kubectl apply -f service.yaml -n {{ target_namespace }}"
+
+    - name: Wait for all 3 pods rollout to be ready
+      ansible.builtin.command:
+        cmd: "kubectl rollout status deployment/my-country-service -n {{ target_namespace }} --timeout=120s"
