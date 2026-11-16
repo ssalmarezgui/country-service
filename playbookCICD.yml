@@ -15,15 +15,15 @@
 
   tasks:
     - name: Log in to Docker Hub
-       ansible.builtin.shell:
-         cmd: 'echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin'
-       environment:
-         DOCKERHUB_USER: "{{ dockerhub_username }}"
-         DOCKERHUB_PASS: "{{ dockerhub_password }}"
-       register: login_result
-       retries: 3
-       delay: 5
-       until: login_result.rc == 0
+      ansible.builtin.shell:
+        cmd: 'echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin'
+      environment:
+        DOCKERHUB_USER: "{{ dockerhub_username }}"
+        DOCKERHUB_PASS: "{{ dockerhub_password }}"
+      register: login_result
+      retries: 3
+      delay: 5
+      until: login_result.rc == 0
 
     - name: Build Docker image
       ansible.builtin.command:
@@ -32,6 +32,10 @@
     - name: Push the Docker image to Docker Hub
       ansible.builtin.command:
         cmd: "docker push {{ dockerhub_username }}/{{ image_name }}:{{ image_tag }}"
+      register: push_result
+      retries: 3
+      delay: 10
+      until: push_result.rc == 0
 
     - name: Inject image tag into deployment.yaml
       ansible.builtin.replace:
